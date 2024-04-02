@@ -11,6 +11,7 @@ The goal is to use computational methods to unveil cell-cell communication betwe
 **NicheNet**: a computational algorithm to model intercellular communication
 
 > install.packages("devtools")
+> 
 > devtools::install_github("saeyslab/nichenetr")
 
 Git repo of NicheNet: https://github.com/saeyslab/nichenetr/tree/master
