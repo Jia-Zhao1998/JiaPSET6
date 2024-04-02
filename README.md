@@ -8,7 +8,7 @@ The goal is to use computational methods to unveil cell-cell communication betwe
 
 ## Citation/Method
 
-**NicheNet**
+**NicheNet**: a computational algorithm to model intercellular communication
 
 Browaeys, R.; Saelens, W.; Saeys, Y. NicheNet: Modeling Intercellular Communication by Linking Ligands to Target Genes. Nat. Methods 2020, 17 (2), 159–162. https://doi.org/10.1038/s41592-019-0667-5.
 
@@ -28,7 +28,7 @@ I have subfolders in this repo
 
 - data: the raw data of single cell RNAseq of human and mouse white adipose tissue
 - code: source files for producing the figure
-- figure: the final figure
+- figure: the final figure for PSET6
 - raw: Intermediate data files produced by the scripts. These files are not git committed.
 
 ## Installation
@@ -36,5 +36,7 @@ I have subfolders in this repo
 How do I run your code? What software and package versions do I need to install?
 
 R version 4.3.3
+
 RStudio version: 2023.12.1.402
+
 Packages: 
