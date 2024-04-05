@@ -32,14 +32,14 @@ library(tidyverse)
 
 **NicheNet can predict:**
 
-1)  which ligands from one cell population (“sender/niche”) are most likely to affect target gene expression in an interacting cell population (“receiver/target”)
+1)  **Upstream ligand analysis**: which ligands from one cell population (“sender/niche”) are most likely to affect target gene expression in an interacting cell population (“receiver/target”). This requires prior knowledge of defining a gene set of interest in the receiver cells (e.g. control vs mutant -\> find differentially expressed genes).
 
-2)  which specific target genes are affected by which of these predicted ligands
+2)  **Downstream ligand activity analysis**: which specific target genes are affected by which of these predicted ligands.
 
 **Workflow:**
 
 1.  Define a sender cell population and a receiver cell population and determine which genes are expressed in both populations
-2.  Define a gene set. **Define differential expressed genes in receiver cells potentially affected by ligands** (*Most challenging*)
+2.  (**Critical step**) Define a gene set. **Define differential expressed genes in receiver cells potentially affected by ligands** (*Most challenging*)
 3.  Define a ligand set: from sender cells and can potentially bind to receiver cells
 4.  NicheNet ligand activity analysis: rank ligands based on the gene expression of target genes in the receiver cells
 5.  Infer top-predicted target genes based on top-ranked ligands
@@ -64,11 +64,11 @@ ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
 
 ```
 
-Expression data of interacting cells: publicly available single-cell data from CAF and malignant cells from head and neck squamous cell carcinoma (HNSCC) tumors:
+**Data**: Expression data of interacting cells: publicly available single-cell data from CAF and malignant cells from head and neck squamous cell carcinoma (HNSCC) tumors:
 
-A subset of malignant cells expressing partial epithelial-to-mesenchymal transition (p-EMT) program interacts with cancer associated fibroblasts (CAFs).
+**Observation**: A subset of malignant cells expressing partial epithelial-to-mesenchymal transition (p-EMT) program interacts with cancer associated fibroblasts (CAFs).
 
-Hypothesis: CAF-ligands regulates the expression of p-EMT genes in neighboring
+**Hypothesis**: CAF-ligands regulates the expression of p-EMT genes in neighboring
 
 ```{r}
 hnscc_expression = readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
