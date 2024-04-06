@@ -36,6 +36,20 @@ library(tidyverse)
 
 2)  **Downstream ligand activity analysis**: which specific target genes are affected by which of these predicted ligands.
 
+3)  Other functionalities include:
+
+    -   assessing how well ligands expressed by a sender cell can predict changes in gene expression in the receiver cell
+
+    -   prioritizing ligands based on their effect on gene expression
+
+    -   inferring putative ligand-target links active in the system under study
+
+    -   inferring potential signaling paths between ligands and target genes of interest: to generate causal hypotheses and check which data sources support the predictions
+
+    -   validation of the prior ligand-target model
+
+    -   construction of user-defined prior ligand-target model
+
 **Workflow:**
 
 1.  Define a sender cell population and a receiver cell population and determine which genes are expressed in both populations

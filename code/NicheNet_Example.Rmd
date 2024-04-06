@@ -36,6 +36,20 @@ library(tidyverse)
 
 2)  **Downstream ligand activity analysis**: which specific target genes are affected by which of these predicted ligands.
 
+3)  Other functionalities include:
+
+    -   assessing how well ligands expressed by a sender cell can predict changes in gene expression in the receiver cell
+
+    -   prioritizing ligands based on their effect on gene expression
+
+    -   inferring putative ligand-target links active in the system under study
+
+    -   inferring potential signaling paths between ligands and target genes of interest: to generate causal hypotheses and check which data sources support the predictions
+
+    -   validation of the prior ligand-target model
+
+    -   construction of user-defined prior ligand-target model
+
 **Workflow:**
 
 1.  Define a sender cell population and a receiver cell population and determine which genes are expressed in both populations
@@ -145,12 +159,13 @@ length(expressed_genes_receiver)
 
 # Step 2: Define the gene set of interest and a background of genes (Crucial step)
 
-As gene set of interest, we consider the genes of which the expression is possibly affected due to communication with other cells.
+As gene set of interest, we consider the genes of which the expression is possibly affected due to communication with other cells. Because we here want to investigate how CAFs regulate the expression of p-EMT genes in malignant cells, we will use the **p-EMT gene set** defined by Puram et al. as gene set of interest and use all genes expressed in malignant cells as background of genes.
 
 The definition of this gene set depends on your research question and is a crucial step in the use of NicheNet.
 
 ```{r}
-geneset_oi = readr::read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_names = "gene") %>% pull(gene) %>% .[. %in% rownames(ligand_target_matrix)] # only consider genes also present in the NicheNet model - this excludes genes from the gene list for which the official HGNC symbol was not used by Puram et al.
+# p-EMT gene set
+geneset_oi = readr::read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_names = "gene") %>% pull(gene) %>% .[. %in% rownames(ligand_target_matrix)] # only consider genes also present in the NicheNet model - this excludes genes from the gene list for which the official HGNC symbol was not used by Puram et al. 
 
 head(geneset_oi)
 ## [1] "SERPINE1" "TGFBI"    "MMP10"    "LAMC2"    "P4HA2"    "PDPN"
@@ -218,10 +233,16 @@ head(potential_ligands)
 Now perform the ligand activity analysis: in this analysis, we will calculate the ligand activity of each ligand, or in other words, we will assess how well each CAF-ligand can predict the p-EMT gene set compared to the background of expressed genes (predict whether a gene belongs to the p-EMT program or not).
 
 ```{r}
+# Function arguments/parameters:
+# geneset: p-EMT gene set defined by Puram et al
+# background_expressed_genes: non p-EMT gene set
+# ligand_target_matrix: matrix created by NicheNet authors Browaeys, Saelens and Saeys
+# potential_ligands: list of potential ligands
+
 ligand_activities = predict_ligand_activities(geneset = geneset_oi, background_expressed_genes = background_expressed_genes, ligand_target_matrix = ligand_target_matrix, potential_ligands = potential_ligands)
 ```
 
-Now, we want to rank the ligands based on their ligand activity. In our validation study, we showed that the area under the precision-recall curve (AUPR) between a ligand’s target predictions and the observed transcriptional response was the most informative measure to define ligand activity (this was the Pearson correlation for v1). Therefore, we will rank the ligands based on their AUPR. This allows us to prioritize p-EMT-regulating ligands.
+Now, we want to **rank the ligands based on their ligand activity**. In our validation study, we showed that the area under the precision-recall curve (AUPR) between a ligand’s target predictions and the observed transcriptional response was the most informative measure to define ligand activity (this was the Pearson correlation for v1). Therefore, we will rank the ligands based on their AUPR. This allows us to prioritize p-EMT-regulating ligands.
 
 ```{r}
 ligand_activities %>% arrange(-aupr_corrected) 
@@ -239,10 +260,17 @@ ligand_activities %>% arrange(-aupr_corrected)
 ##  9 BMP5        0.750 0.0691         0.0538   0.148
 ## 10 VCAN        0.720 0.0687         0.0534   0.140
 ## # … with 202 more rows
+
+# auroc: area under the receiver operating characteristic curve, range 0 - 1, 1: better in distinguishing between true positives and false positives
+# aupr: Area Under the Precision-Recall Curve, range 0 - 1, 1: model is better in predicting true positives
+# pearson: Pearson correlation coefficients, measure the linear correlations, range from -1 to 1
+
 best_upstream_ligands = ligand_activities %>% top_n(30, aupr_corrected) %>% arrange(-aupr_corrected) %>% pull(test_ligand)
 head(best_upstream_ligands)
 ## [1] "TGFB2"  "BMP8A"  "INHBA"  "CXCL12" "LTBP1"  "CCN2"
 ```
+
+Why those 30 ligands are not all listed in Fig.2a???
 
 We see here that the performance metrics indicate that the 30 top-ranked ligands can predict the p-EMT genes reasonably, this implies that ranking of the ligands might be accurate as shown in our study. However, it is possible that for some gene sets, the target gene prediction performance of the top-ranked ligands would not be much better than random prediction. In that case, prioritization of ligands will be less trustworthy.
 
@@ -259,9 +287,13 @@ p_hist_lig_activity = ggplot(ligand_activities, aes(x=aupr_corrected)) +
 p_hist_lig_activity
 ```
 
+Right-skewed distribution
+
+The ligand activity for any given ligand is relatively low, meaning no single ligand can predict the p-EMT gene set.
+
 # Step 5: Infer target genes of top-ranked ligands and visualize in a heatmap
 
-Now we will show how you can look at the regulatory potential scores between ligands and target genes of interest. In this case, we will look at links between top-ranked p-EMT regulating ligands and p-EMT genes. In the ligand-target heatmaps, we show here regulatory potential scores for interactions between the 20 top-ranked ligands and following target genes: genes that belong to the gene set of interest and to the 250 most strongly predicted targets of at least one of the 20 top-ranked ligands (the top 250 targets according to the general prior model, so not the top 250 targets for this dataset). Consequently, genes of your gene set that are not a top target gene of one of the prioritized ligands, will not be shown on the heatmap.
+Now we will show how you can look at the regulatory potential scores between ligands and target genes of interest. In this case, we will look at links between top-ranked p-EMT regulating ligands and p-EMT genes. In the ligand-target heatmaps, we show here regulatory potential scores for interactions between the 30 top-ranked ligands and following target genes: genes that belong to the gene set of interest and to the 250 most strongly predicted targets of at least one of the 30 top-ranked ligands (the top 250 targets according to the general prior model, so not the top 250 targets for this dataset). Consequently, genes of your gene set that are not a top target gene of one of the prioritized ligands, will not be shown on the heatmap.
 
 ```{r}
 active_ligand_target_links_df = best_upstream_ligands %>% lapply(get_weighted_ligand_target_links,geneset = geneset_oi, ligand_target_matrix = ligand_target_matrix, n = 250) %>% bind_rows()
@@ -280,32 +312,31 @@ head(active_ligand_target_links_df)
 ## 6 TGFB2  F3      0.0747
 ```
 
-For visualization purposes, we adapted the ligand-target regulatory potential matrix as follows. Regulatory potential scores were set as 0 if their score was below a predefined threshold, which was here the 0.25 quantile of scores of interactions between the 30 top-ranked ligands and each of their respective top targets (see the ligand-target network defined in the data frame).
+For visualization purposes, we adapted the ligand-target regulatory potential matrix as follows. Regulatory potential scores were set as 0 if their score was below a predefined threshold, which was here the **0.25** **quantile** of scores of interactions between the 30 top-ranked ligands and each of their respective top targets (see the ligand-target network defined in the data frame).
 
 ```{r}
 active_ligand_target_links = prepare_ligand_target_visualization(ligand_target_df = active_ligand_target_links_df, ligand_target_matrix = ligand_target_matrix, cutoff = 0.25)
 
-nrow(active_ligand_target_links_df)
-## [1] 460
-head(active_ligand_target_links_df)
-## # A tibble: 6 × 3
-##   ligand target  weight
-##   <chr>  <chr>    <dbl>
-## 1 TGFB2  ACTN1   0.0849
-## 2 TGFB2  C1S     0.124 
-## 3 TGFB2  COL17A1 0.0732
-## 4 TGFB2  COL1A1  0.243 
-## 5 TGFB2  COL4A2  0.148 
-## 6 TGFB2  F3      0.0747
+nrow(active_ligand_target_links)
+## [1] 53
+# Every row represents a target while the column is the ligand
+
+head(active_ligand_target_links, n = 2)
 ```
 
 The putatively active ligand-target links will now be visualized in a heatmap. The order of the ligands accord to the ranking according to the ligand activity prediction.
 
 ```{r}
-order_ligands = intersect(best_upstream_ligands, colnames(active_ligand_target_links)) %>% rev()
+# Extract ligands and reverse the order
+order_ligands = intersect(best_upstream_ligands, colnames(active_ligand_target_links)) %>% rev() 
+
+# Extract the targets and get a unique list
 order_targets = active_ligand_target_links_df$target %>% unique()
+
+# subset the data frame of active_ligand_target_links and transpose so ligand is in row while target is in column, easier for heatmap generation
 vis_ligand_target = active_ligand_target_links[order_targets,order_ligands] %>% t()
 
+# Generate heatmap
 p_ligand_target_network = vis_ligand_target %>% make_heatmap_ggplot("Prioritized CAF-ligands","p-EMT genes in malignant cells", color = "purple",legend_position = "top", x_axis_position = "top",legend_title = "Regulatory potential") + scale_fill_gradient2(low = "whitesmoke",  high = "purple", breaks = c(0,0.005,0.01)) + theme(axis.text.x = element_text(face = "italic"))
 
 p_ligand_target_network
@@ -317,7 +348,7 @@ If you would consider more than the top 250 targets based on prior information, 
 
 If you would change the quantile cutoff that is used to set scores to 0 (for visualization purposes), lowering this cutoff will result in a more dense heatmap, whereas highering this cutoff will result in a more sparse heatmap.
 
-# Follow-up analysis 1: Ligand-receptor network inference for top-ranked ligands
+# Follow-up analysis 1: Receptor inference: Ligand-receptor network inference for top-ranked ligands
 
 One type of follow-up analysis is looking at which receptors of the receiver cell population (here: malignant cells) can potentially bind to the prioritized ligands from the sender cell population (here: CAFs).
 
@@ -366,7 +397,7 @@ library(cowplot)
 library(ggpubr)
 ```
 
-Prepare the ligand activity matrix
+**Prepare the ligand activity matrix**
 
 ```{r}
 ligand_aupr_matrix = ligand_activities %>% select(aupr_corrected) %>% as.matrix() %>% magrittr::set_rownames(ligand_activities$test_ligand)
@@ -379,7 +410,7 @@ p_ligand_aupr = vis_ligand_aupr %>% make_heatmap_ggplot("Prioritized CAF-ligands
 p_ligand_aupr
 ```
 
-Prepare expression of ligands in fibroblast per tumor
+**Prepare expression of ligands in fibroblast per tumor**
 
 Because the single-cell data was collected from multiple tumors, we will show here the average expression of the ligands per tumor.
 
@@ -403,7 +434,7 @@ p_ligand_tumor_expression = vis_ligand_tumor_expression %>% make_heatmap_ggplot(
 p_ligand_tumor_expression
 ```
 
-Prepare expression of target genes in malignant cells per tumor
+**Prepare expression of target genes in malignant cells per tumor**
 
 ```{r}
 expression_df_target = expression[malignant_ids,geneset_oi] %>% data.frame() %>% rownames_to_column("cell") %>% as_tibble() %>% inner_join(sample_info %>% select(cell,tumor), by =  "cell") 
@@ -422,7 +453,7 @@ p_target_tumor_scaled_expression = vis_target_tumor_expression_scaled  %>% make_
 p_target_tumor_scaled_expression
 ```
 
-Combine the different heatmaps in one overview figure
+**Combine the different heatmaps in one overview figure**
 
 ```{r}
 figures_without_legend = plot_grid(
@@ -452,11 +483,11 @@ plot_grid(figures_without_legend,
 
 # Other follow-up analyses:
 
-As another follow-up analysis, you can infer possible signaling paths between ligands and targets of interest. You can read how to do this in the following vignette Inferring ligand-to-target signaling paths:vignette("ligand_target_signaling_path", package="nichenetr").
+As another follow-up analysis, you can **infer possible signaling paths between ligands and targets of interest**. You can read how to do this in the following vignette [Inferring ligand-to-target signaling paths](https://github.com/saeyslab/nichenetr/blob/master/vignettes/ligand_target_signaling_path.md):vignette("ligand_target_signaling_path", package="nichenetr"). **(Jia: Could be very useful for Estrogen signaling and CCL8 signaling!!!)**
 
-Another follow-up analysis is getting a “tangible” measure of how well top-ranked ligands predict the gene set of interest and assess which genes of the gene set can be predicted well. You can read how to do this in the following vignette Assess how well top-ranked ligands can predict a gene set of interest:vignette("target_prediction_evaluation_geneset", package="nichenetr").
+Another follow-up analysis is getting a “tangible” measure of how well top-ranked ligands predict the gene set of interest and assess which genes of the gene set can be predicted well. You can read how to do this in the following vignette [Assess how well top-ranked ligands can predict a gene set of interest](https://github.com/saeyslab/nichenetr/blob/master/vignettes/target_prediction_evaluation_geneset.md):vignette("target_prediction_evaluation_geneset", package="nichenetr").
 
-In case you want to visualize ligand-target links between multiple interacting cells, you can make an appealing circos plot as shown in vignette Circos plot visualization to show active ligand-target links between interacting cells:vignette("circos", package="nichenetr").
+In case you want to visualize ligand-target links between multiple interacting cells, you can make an appealing circos plot as shown in vignette [Circos plot visualization to show active ligand-target links between interacting cells](https://github.com/saeyslab/nichenetr/blob/master/vignettes/circos.md):vignette("circos", package="nichenetr").
 
 # References
 
