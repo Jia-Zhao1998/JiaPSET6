@@ -22,6 +22,13 @@ Browaeys, R.; Saelens, W.; Saeys, Y. NicheNet: Modeling Intercellular Communicat
 
 At a high level, how was the data generated?
 
+**RNA-seq data of fat tissue resident macrophages in fat (VAMs) and other resident cells** 
+
+**I used this dataset for PSET6 assignment**
+
+Moura Silva Hernandez; Kitoko Jamil Zola; Queiroz Camila Pereira; Kroehling Lina; Matheis Fanny; Yang Katharine Lu; Reis Bernardo S.; Ren-Fielding Christine; Littman Dan R.; Bozza Marcelo Torres; Mucida Daniel; Lafaille Juan J. C-MAF–Dependent Perivascular Macrophages Regulate Diet-Induced Metabolic Syndrome. Sci. Immunol. 2021, 6 (64), eabg7506. https://doi.org/10.1126/sciimmunol.abg7506.![image](https://github.com/Jia-Zhao1998/JiaPSET6/assets/67213486/3a65aea6-b3d7-4e45-9b02-ee70328722ec)
+
+
 **A Single-Cell Atlas of Human and Mouse White Adipose Tissue**
 
 Emont, M. P.; Jacobs, C.; Essene, A. L.; Pant, D.; Tenen, D.; Colleluori, G.; Di Vincenzo, A.; Jørgensen, A. M.; Dashti, H.; Stefek, A.; McGonagle, E.; Strobel, S.; Laber, S.; Agrawal, S.; Westcott, G. P.; Kar, A.; Veregge, M. L.; Gulko, A.; Srinivasan, H.; Kramer, Z.; De Filippis, E.; Merkel, E.; Ducie, J.; Boyd, C. G.; Gourash, W.; Courcoulas, A.; Lin, S. J.; Lee, B. T.; Morris, D.; Tobias, A.; Khera, A. V.; Claussnitzer, M.; Pers, T. H.; Giordano, A.; Ashenberg, O.; Regev, A.; Tsai, L. T.; Rosen, E. D. A Single-Cell Atlas of Human and Mouse White Adipose Tissue. Nature 2022, 603 (7903), 926–933. https://doi.org/10.1038/s41586-022-04518-2.
