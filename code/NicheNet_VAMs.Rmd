@@ -214,10 +214,11 @@ dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
                               colData = colData,
                               design = ~ condition)
 dds <- DESeq(dds)
-res <- results(dds, contrast = c("condition", "Adipocyte-WT", "FRC-WT"))
+# "Adipocyte-WT" is treated as the experimental condition, and "FRC-WT" as the reference
+results <- results(dds, contrast = c("condition", "Adipocyte-WT", "FRC-WT"))
 
 # Adjusting for multiple testing, for example, using Benjamini-Hochberg procedure
-results <- res[order(res$padj),] # Ordering by adjusted p-value
+results <- results[order(results$padj),] # Ordering by adjusted p-value
 
 # Viewing top differentially expressed genes
 head(results)
@@ -240,6 +241,35 @@ head(results)
 
 ```
 
+### **Filter to identify significantly expressed genes based on three criteria**
+
+1.  padj \< 0.05
+2.  absolute log fold change between groups in normalized counts (expression) \> 2
+3.  mean expression \> 100
+
+```{r}
+# Convert results to a data frame, typically needed for ggplot2-based plotting
+res_df <- as.data.frame(results)
+
+# Filter for significant genes with padj < 0.05 and absolute log fold change in normalized counts (expression) > 2 and mean expression > 100
+significant_genes <- res_df[res_df$padj < 0.05 & abs(res_df$log2FoldChange) > 2 & res_df$baseMean > 100, ] %>% distinct()
+
+nrow(significant_genes)
+# [1] 1664
+
+# Filter significantly upregulated genes & log fold change in normalized counts (expression) > 2 and rank in decreasing log2FoldCahnge
+gene_Upregulated <- significant_genes[significant_genes$log2FoldChange > 2, ] %>% arrange(desc(log2FoldChange))
+nrow((gene_Upregulated))
+head(gene_Upregulated)
+# [1] 837
+
+# Filter significantly downregulated genes & log fold change in normalized counts (expression) < -2 and rank based on decreasing absolute value of log2FoldChange
+gene_Downregulated <- significant_genes[significant_genes$log2FoldChange < -2, ] %>% arrange(desc(abs(log2FoldChange)))
+nrow(gene_Downregulated)
+head(gene_Downregulated)
+# [1] 828
+```
+
 ### Plot
 
 **MA plot**
@@ -251,8 +281,13 @@ For y axis, positive values indicate upregulation in "WT Adipocyte" relative to 
 **Points**: Each point represents a gene. Points that lie along the horizontal line at 0 indicate no change in expression between the two conditions. Points above the line are more highly expressed in "WT Adipocyte" compared to "FRC," and points below are less expressed.
 
 ```{r}
+# Open a PDF device
+# pdf("MA_Plot_WT_Adipocyte_vs_FRC.pdf", width = 7, height = 5)
+
 plotMA(results, main="MA Plot: WT Adipocyte vs FRC", ylim=c(-15,15))
 
+# Close the device to save the plot
+# dev.off()
 ```
 
 The basic plotMA function does not offer arguments to adjust the x axis to log scale. Need to try ggmaplot, which allows more modifications
@@ -260,13 +295,22 @@ The basic plotMA function does not offer arguments to adjust the x axis to log s
 ```{r}
 library(EnhancedVolcano)
 
-# Assuming 'res' contains the results from DESeq2
-# Convert results to a data frame, typically needed for ggplot2-based plotting
-res_df <- as.data.frame(res)
-
 # The `ggmaplot` function may require specific naming of columns; 
 res_df$gene <- rownames(res_df)  # Ensure there's a 'gene' column for gene names
 res_df$log2MeanExpression <- log2(res_df$baseMean + 1)  # Add log2 mean expression
+
+# Pre-select top 15 upregulated and downregulated genes
+top_upregulated_genes <- gene_Upregulated %>% arrange(desc(log2FoldChange), desc(baseMean)) %>%
+  slice_head(n = 15)
+
+top_downregulated_genes <- res_df %>%
+  filter(padj < 0.05, log2FoldChange < -2) %>% arrange(desc(abs(log2FoldChange)), desc(baseMean)) %>% slice_head(n = 15)
+```
+
+```{r}
+# Generate MA plot
+
+# pdf("../figure/MA_Plot_WT_Adipocyte_vs_FRC-2.pdf", width = 7, height = 5)
 
 # Now we'll use the ggmaplot function
 ggmaplot(
@@ -278,30 +322,15 @@ ggmaplot(
   alpha = 0.7,
   font.label = c(12, "plain", "black"),
   palette = c("red", "blue", "darkgray"),
-  top = 15,
+  top = 30,
   select.top.method = c("padj", "fc"),
   main = "MA Plot: WT Adipocyte vs FRC",
   xlab = "Log2 mean expression",
   ylab = "Log2 fold change",
   ggtheme = theme_classic()
 )
-```
 
-```{r}
-# Filter for significant genes with padj < 0.05 and absolute log fold change in normalized counts (expression) > 2 and mean expression > 100
-significant_genes <- res_df[res_df$padj < 0.05 & abs(res_df$log2FoldChange) > 2 & res_df$baseMean > 100, ] %>% unique() %>% arrange(desc(log2FoldChange)) 
-
-# Filter significantly upregulated genes & log fold change in normalized counts (expression) > 2 and rank
-gene_Upregulated <- significant_genes[significant_genes$log2FoldChange > 2, ]
-nrow((gene_Upregulated))
-head(gene_Upregulated)
-# [1] 828
-
-# Filter significantly downregulated genes & log fold change in normalized counts (expression) < -2 and rank based on absolute value of log2FoldChange
-gene_Downregulated <- significant_genes[significant_genes$log2FoldChange < -2, ] %>% arrange(desc(abs(log2FoldChange)))
-nrow(gene_Downregulated)
-head(gene_Downregulated)
-# [1] 837
+# dev.off()
 ```
 
 **Volcano plot**
