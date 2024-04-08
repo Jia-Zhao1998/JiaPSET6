@@ -50,19 +50,33 @@ library(tidyverse)
 
     -   construction of user-defined prior ligand-target model
 
+# Problem definition:
+
+Tissue resident macrophages (TRMs) are present ubiquitously in every tissue and organ, yet how they support tissue and organ function is largely unknown. Since intercellular commnunication is critical for tissue homeostasis, we aim to study intercellular commnunication by infer interaction between TRMs and other cell types.
+
+This document is focused on the infering intercellular communication between TRMs and the primary cells adipocytes in white adipose tissue. Since the paper calls fat TRMs as VAMs, we will use VAMs from now on.
+
 **Workflow:**
 
-1.  Define a sender cell population and a receiver cell population and determine which genes are expressed in both populations
-2.  (**Critical step**) Define a gene set. **Define differential expressed genes in receiver cells potentially affected by ligands** (*Most challenging*)
+1.  Define a sender cell population and a receiver cell population and determine which genes are expressed in both populations:
+
+    *a. sender: VAMs, receiver: adipocytes*
+
+2.  (**Critical step**) Define a gene set. **Define differential expressed genes (DEGs) in receiver cells potentially affected by ligands** (*Most challenging*)
+
+    a\. DEGs: Use adipocytes RNA-seq data vs preadipocytes (called FRCs (fibroblast reticular cells) in Moura Silva dataset)
+
 3.  Define a ligand set: from sender cells and can potentially bind to receiver cells
+
 4.  NicheNet ligand activity analysis: rank ligands based on the gene expression of target genes in the receiver cells
+
 5.  Infer top-predicted target genes based on top-ranked ligands
 
 # Step 0: Load NicheNet’s ligand-target prior model and processed expression data of interacting cells
 
 ```{r}
 options(timeout = 600)
-organism = "human"
+organism = "mouse"
 
 if(organism == "human"){
   lr_network = readRDS(url("https://zenodo.org/record/7074291/files/lr_network_human_21122021.rds"))
@@ -78,58 +92,256 @@ ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
 
 ```
 
-**Data**: Expression data of interacting cells: publicly available single-cell data from CAF and malignant cells from head and neck squamous cell carcinoma (HNSCC) tumors:
+**Data**: Expression data of interacting cells: publicly available RNA-seq data in white adipose tissue, including VAMs and adipocytes from wild-type adult C57BL/6J male mice (12-16 wk):
 
-**Observation**: A subset of malignant cells expressing partial epithelial-to-mesenchymal transition (p-EMT) program interacts with cancer associated fibroblasts (CAFs).
+**Motivation**: Macrophage can sense the environment and coordinate with other cells. It is intriguing that VAMs are present ubiquitously inside the white adipose tissue. What are their functions? Surprisingly, VAMs are present in neonate fat before mature adipocyte, indicating the role of VAMs in adipocyte differentiation and maturation. How do VAMs communicate with adipocytes?
 
-**Hypothesis**: CAF-ligands regulates the expression of p-EMT genes in neighboring
+**Hypothesis**: VAMs-ligands regulate the expression of adipocytes-maturation genes
+
+**Import our RNA-seq dataset containing TRM subset named VAM1 (Vasculature Associated Macrophages 1) and adipocytes for WT and c-Maf deletion**
 
 ```{r}
-hnscc_expression = readRDS(url("https://zenodo.org/record/3260758/files/hnscc_expression.rds"))
-expression = hnscc_expression$expression
-sample_info = hnscc_expression$sample_info # contains meta-information about the cells
+cMaf_data <- read_xlsx('~/Desktop/Jia_Zhao_PhD/Projects/Computational/RNASeq/MAF VS WT 07-11-19.xlsx')
+head(cMaf_data)
 ```
 
-Because the NicheNet 2.0. networks are in the most recent version of the official gene symbols, we will make sure that the gene symbols used in the expression data are also updated (= converted from their “aliases” to official gene symbols).
-
 ```{r}
-# If this is not done, there will be 35 genes fewer in lr_network_expressed!
-colnames(expression) = convert_alias_to_symbols(colnames(expression), "human", verbose = FALSE)
+# Because the NicheNet 2.0. networks are in the most recent version of the official gene symbols, we will make sure that the gene symbols used in the expression data are also updated (= converted from their “aliases” to official gene symbols).
+
+gene_name <- cMaf_data$gene
+gene_name_symbol <- convert_alias_to_symbols(gene_name, "mouse", verbose = FALSE) %>% unique()
 ```
 
 # Step 1: Define expressed genes in sender and receiver cell populations
 
-Question: which ligands expressed by CAFs can induce p-EMT in neighboring malignant cells?
-
-> \*\*Paracrine\*
-
-> Sender cells: CAFs
-
-> Receiver cells: neighboring malignant cells
+Question: which ligands expressed by VAMs can induce adipocyte maturation from preadipocytes?
 
 ```{r}
-tumors_remove = c("HN10","HN","HN12", "HN13", "HN24", "HN7", "HN8","HN23")
+# Make a function to extract expressuion data from our RNA-seq data set based on cell types
 
-CAF_ids = sample_info %>% filter(`Lymph node` == 0 & !(tumor %in% tumors_remove) & `non-cancer cell type` == "CAF") %>% pull(cell)
-malignant_ids = sample_info %>% filter(`Lymph node` == 0 & !(tumor %in% tumors_remove) & `classified  as cancer cell` == 1) %>% pull(cell)
+extract_expression <- function(data, pattern, cutoff = 100) {
+  # Identify columns matching the pattern: e.g. "VAM1-WT", "Adipocyte-WT"
+  expression_oi = grepl(pattern, names(data)) | grepl("gene", names(data))
+  
+  # Include the first column explicitly
+  expression_oi[1] = TRUE
+  
+  # Extract relevant columns
+  expression_df = data[, expression_oi]
+  
+  # Assume the gene expression columns start from the 2nd column to 4th column
+  expression_df$average = rowMeans(expression_df[, 2:4], na.rm = TRUE)
+  
+  # Filter based on the cutoff
+  filtered_expression_df = expression_df[expression_df$average > cutoff, ]
+  
+  # Print number of rows after filtering
+  nrow <- nrow(filtered_expression_df) %>% unique()
+  print(nrow)
+  
+  return(filtered_expression_df)
+}
+```
 
-expressed_genes_sender = expression[CAF_ids,] %>% apply(2,function(x){10*(2**x - 1)}) %>% apply(2,function(x){log2(mean(x) + 1)}) %>% .[. >= 4] %>% names()
+## Sender cells: VAMs
 
-expressed_genes_receiver = expression[malignant_ids,] %>% apply(2,function(x){10*(2**x - 1)}) %>% apply(2,function(x){log2(mean(x) + 1)}) %>% .[. >= 4] %>% names()
+```{r}
+VAMs_expression_df <- extract_expression(data = cMaf_data, pattern = "VAM1-WT", cutoff = 100)
 
-# Check the number of expressed genes: should be a 'reasonable' number of total expressed genes in a cell type, e.g. between 5000-10000 (and not 500 or 20000)
-length(expressed_genes_sender)
-## [1] 6706
-length(expressed_genes_receiver)
-## [1] 6351
+expressed_genes_sender <-VAMs_expression_df
+```
+
+## Receiver cells: Adipocytes/FRCs
+
+```{r}
+# Extract receiver cells expression: Adipocytes and adipocytes progeneitor (FRCs) 
+
+# Adipocytes
+Adipocyte_expression_df <- extract_expression(data = cMaf_data, pattern = "Adipocyte-WT", cutoff = 100)
+# number of rows of the filtered data
+# [1] 9905
+
+
+# FRCs
+FRC_expression_df <- extract_expression(data = cMaf_data, pattern = "FRC-WT", cutoff = 100)
+# number of rows of the filtered data
+# [1] 9903
+
+expressed_genes_receiver_adipocyte <- Adipocyte_expression_df
+expressed_genes_receiver_FRC <- FRC_expression_df
 ```
 
 # Step 2: Define the gene set of interest and a background of genes
 
-As gene set of interest, we consider the genes of which the expression is possibly affected due to communication with other cells. The definition of this gene set depends on your research question and is a crucial step in the use of NicheNet.
+## DEG analysis to define potential genes involved in adipocyte maturation 
+
+Here I can start by find differentially expressed genes (DEGs) between adipocytes and preadipocytes to find genes involved in adipocyte maturation
+
+**Note**: As gene set of interest, we consider the genes of which the expression is possibly affected due to communication with other cells. The definition of this gene set depends on your research question and is a crucial step in the use of NicheNet.
+
+### Prepare data
 
 ```{r}
-geneset_oi = readr::read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_names = "gene") %>% pull(gene) %>% .[. %in% rownames(ligand_target_matrix)] # only consider genes also present in the NicheNet model - this excludes genes from the gene list for which the official HGNC symbol was not used by Puram et al.
+# Load packages
+library(DESeq2)
+
+# Extract relevant columns
+# Ensure the gene column is not included in the counts matrix
+relevant_columns <- grep("gene|Adipocyte-WT|FRC-WT", names(cMaf_data))
+counts_matrix_gene <- as.matrix(cMaf_data[, relevant_columns]) 
+
+# The counts_matrix_gene contains float data which is not compatible with DESeq2. Need to convert to integers
+# Prep the matrix to remove gene name and convert to interger
+counts_matrix <- counts_matrix_gene[,-1]
+# Convert the counts_matrix to integers
+counts_matrix <- apply(counts_matrix, 2, as.integer)
+
+# Set row names of counts_matrix to gene names from the first column of cMaf_data
+rownames(counts_matrix) <- counts_matrix_gene[, 1]
+
+# Prepare metadata
+conditions <- c(rep("Adipocyte-WT", 3), rep("FRC-WT", 3)) # 3 biological replicates
+colData <- data.frame(row.names = colnames(counts_matrix), condition = conditions)
+
+
+```
+
+### DESeq2 Analysis
+
+```{r}
+# Perform DEG analysis
+dds <- DESeqDataSetFromMatrix(countData = counts_matrix,
+                              colData = colData,
+                              design = ~ condition)
+dds <- DESeq(dds)
+res <- results(dds, contrast = c("condition", "Adipocyte-WT", "FRC-WT"))
+
+# Adjusting for multiple testing, for example, using Benjamini-Hochberg procedure
+results <- res[order(res$padj),] # Ordering by adjusted p-value
+
+# Viewing top differentially expressed genes
+head(results)
+
+# log2 fold change (MLE): condition Adipocyte-WT vs FRC-WT 
+# Wald test p-value: condition Adipocyte-WT vs FRC-WT 
+# DataFrame with 6 rows and 6 columns
+#        baseMean log2FoldChange     lfcSE      stat       pvalue         padj
+#       <numeric>      <numeric> <numeric> <numeric>    <numeric>    <numeric>
+# Cidec   24004.43       10.76535  0.252205   42.6850  0.00000e+00  0.00000e+00
+# Thrsp    8810.62       10.03878  0.269953   37.1871 1.10134e-302 1.21456e-298
+# Scd1   294128.25        7.61268  0.208071   36.5869 4.61853e-293 3.39554e-289
+# Adipoq  26110.90       11.27956  0.314089   35.9120 1.98384e-282 1.09389e-278
+# Pck1    11023.12       10.94758  0.316337   34.6074 1.95692e-262 8.63236e-259
+# Pnpla2   6966.05        6.17142  0.183506   33.6306 5.98560e-248 2.20031e-244
+
+# base mean expression across samples
+# log2 fold changes (indicating how much more or less a gene is expressed in one condition relative to another). Higer means more expression in Adipocyte and vice versa
+
+
+```
+
+### Plot
+
+**MA plot**
+
+Visualize the log fold change of gene expression change (M) against the mean of normalized counts of the gene (A) across all samples. In this case, adipocytes and FRCs.
+
+For y axis, positive values indicate upregulation in "WT Adipocyte" relative to "FRC", while negative values indicate downregulation.
+
+**Points**: Each point represents a gene. Points that lie along the horizontal line at 0 indicate no change in expression between the two conditions. Points above the line are more highly expressed in "WT Adipocyte" compared to "FRC," and points below are less expressed.
+
+```{r}
+plotMA(results, main="MA Plot: WT Adipocyte vs FRC", ylim=c(-15,15))
+
+```
+
+The basic plotMA function does not offer arguments to adjust the x axis to log scale. Need to try ggmaplot, which allows more modifications
+
+```{r}
+library(EnhancedVolcano)
+
+# Assuming 'res' contains the results from DESeq2
+# Convert results to a data frame, typically needed for ggplot2-based plotting
+res_df <- as.data.frame(res)
+
+# The `ggmaplot` function may require specific naming of columns; 
+res_df$gene <- rownames(res_df)  # Ensure there's a 'gene' column for gene names
+res_df$log2MeanExpression <- log2(res_df$baseMean + 1)  # Add log2 mean expression
+
+# Now we'll use the ggmaplot function
+ggmaplot(
+  res_df,
+  fdr = 0.05, # false discovery rate = 0.05
+  fc = 2, # Identify genes with more than four-fold change 
+  genenames = rownames(res_df),
+  size = 1.5,
+  alpha = 0.7,
+  font.label = c(12, "plain", "black"),
+  palette = c("red", "blue", "darkgray"),
+  top = 15,
+  select.top.method = c("padj", "fc"),
+  main = "MA Plot: WT Adipocyte vs FRC",
+  xlab = "Log2 mean expression",
+  ylab = "Log2 fold change",
+  ggtheme = theme_classic()
+)
+```
+
+```{r}
+# Filter for significant genes with padj < 0.05 and absolute log fold change in normalized counts (expression) > 2 and mean expression > 100
+significant_genes <- res_df[res_df$padj < 0.05 & abs(res_df$log2FoldChange) > 2 & res_df$baseMean > 100, ] %>% unique() %>% arrange(desc(log2FoldChange)) 
+
+# Filter significantly upregulated genes & log fold change in normalized counts (expression) > 2 and rank
+gene_Upregulated <- significant_genes[significant_genes$log2FoldChange > 2, ]
+nrow((gene_Upregulated))
+head(gene_Upregulated)
+# [1] 828
+
+# Filter significantly downregulated genes & log fold change in normalized counts (expression) < -2 and rank based on absolute value of log2FoldChange
+gene_Downregulated <- significant_genes[significant_genes$log2FoldChange < -2, ] %>% arrange(desc(abs(log2FoldChange)))
+nrow(gene_Downregulated)
+head(gene_Downregulated)
+# [1] 837
+```
+
+**Volcano plot**
+
+```{r}
+# Basic Volcano Plot
+with(results, plot(log2FoldChange, -log10(pvalue),
+                   pch=20, main="Volcano Plot: Adipocyte-WT vs FRC-WT"))
+abline(h=-log10(0.05), col="red")
+```
+
+```{r}
+# Enhanced Volcano Plot with thresholds
+thresh_pval <- 0.05
+thresh_lfc <- 2
+
+with(results, {
+  plot(log2FoldChange, -log10(pvalue), pch=20, main="Enhanced Volcano Plot: Adipocyte-WT vs FRC-WT")
+  abline(h=-log10(thresh_pval), col="red")
+  significant <- padj < thresh_pval & abs(log2FoldChange) > thresh_lfc
+  points(log2FoldChange[significant], -log10(pvalue)[significant], pch=20, col="blue")
+})
+```
+
+**Heatmap**
+
+```{r}
+library(ComplexHeatmap)
+normalized_counts <- counts(dds, normalized=TRUE)
+top_genes <- rownames(head(results[order(results$padj), ]))
+
+Heatmap(log2(normalized_counts[top_genes, ] + 1),
+        name="log2(normalized counts + 1)",
+        top_annotation = HeatmapAnnotation(condition = colData(dds)$condition),
+        left_annotation = rowAnnotation(FoldChange = results$log2FoldChange[top_genes]))
+
+```
+
+```{r}
+geneset_oi = readr::read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_names = "gene")%>% pull(gene) %>% .[. %in% rownames(ligand_target_matrix)] # only consider genes also present in the NicheNet model - this excludes genes from the gene list for which the official HGNC symbol was not used by Puram et al.
 
 head(geneset_oi)
 ## [1] "SERPINE1" "TGFBI"    "MMP10"    "LAMC2"    "P4HA2"    "PDPN"
@@ -413,11 +625,11 @@ plot_grid(figures_without_legend,
 
 # Other follow-up analyses:
 
-As another follow-up analysis, you can infer possible signaling paths between ligands and targets of interest. You can read how to do this in the following vignette Inferring ligand-to-target signaling paths:vignette("ligand_target_signaling_path", package="nichenetr").
+As another follow-up analysis, you can **infer possible signaling paths between ligands and targets of interest**. You can read how to do this in the following vignette [Inferring ligand-to-target signaling paths](https://github.com/saeyslab/nichenetr/blob/master/vignettes/ligand_target_signaling_path.md):vignette("ligand_target_signaling_path", package="nichenetr"). **(Jia: Could be very useful for Estrogen signaling and CCL8 signaling!!!)**
 
-Another follow-up analysis is getting a “tangible” measure of how well top-ranked ligands predict the gene set of interest and assess which genes of the gene set can be predicted well. You can read how to do this in the following vignette Assess how well top-ranked ligands can predict a gene set of interest:vignette("target_prediction_evaluation_geneset", package="nichenetr").
+Another follow-up analysis is getting a “tangible” measure of how well top-ranked ligands predict the gene set of interest and assess which genes of the gene set can be predicted well. You can read how to do this in the following vignette [Assess how well top-ranked ligands can predict a gene set of interest](https://github.com/saeyslab/nichenetr/blob/master/vignettes/target_prediction_evaluation_geneset.md):vignette("target_prediction_evaluation_geneset", package="nichenetr").
 
-In case you want to visualize ligand-target links between multiple interacting cells, you can make an appealing circos plot as shown in vignette Circos plot visualization to show active ligand-target links between interacting cells:vignette("circos", package="nichenetr").
+In case you want to visualize ligand-target links between multiple interacting cells, you can make an appealing circos plot as shown in vignette [Circos plot visualization to show active ligand-target links between interacting cells](https://github.com/saeyslab/nichenetr/blob/master/vignettes/circos.md):vignette("circos", package="nichenetr").
 
 # References
 
