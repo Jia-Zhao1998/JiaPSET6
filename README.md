@@ -76,10 +76,12 @@ RStudio version: 2023.12.1.402
 
 Packages: I included those relevant codes in **code/NicheNet_VAMs_PSET6.Rmd**
 
-\
-install.packages("devtools")
-devtools::install_github("saeyslab/nichenetr")
-install.packages("tidyverse")
-install.packages("DESeq2")
-install.packages("EnhancedVolcano")
-\
+> install.packages("devtools")
+> 
+> devtools::install_github("saeyslab/nichenetr")
+> 
+> install.packages("tidyverse")
+> 
+> install.packages("DESeq2")
+> 
+> install.packages("EnhancedVolcano")
