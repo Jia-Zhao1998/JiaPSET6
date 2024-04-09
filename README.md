@@ -62,7 +62,7 @@ I have subfolders in this repo
 - figure: the final figures for PSET6:
 
 1. MA_Plot_WT_Adipocyte_vs_FRC.pdf: rough draft 1 of MA plot to visualize the log fold change of gene expression change (M) against the mean of normalized counts of the gene (A) across all samples. In this case, adipocytes and fibroblast reticular cells (FRCs), which are mainly proadipocytes.
-2. MA_Plot_WT_Adipocyte_vs_FRC-2.pdf: better version of MA plot. [image](https://github.com/Jia-Zhao1998/JiaPSET6/blob/main/figure/MA_Plot_WT_Adipocyte_vs_FRC-2.pdf)
+2. MA_Plot_WT_Adipocyte_vs_FRC-2.pdf: better version of MA plot. ![Link to this MA-plot](https://github.com/Jia-Zhao1998/JiaPSET6/blob/main/figure/MA_Plot_WT_Adipocyte_vs_FRC-2.pdf)
 4. Volcano_Plot_WT_Adipocyte_vs_FRC.pdf: Visualize significantly upregulated or downregulated genes in adipocytes vs FRCs 
 5. Heatmap_Plot_WT_Adipocyte_vs_FRC.pdf: to show top 5 upregulated genes in adipocytes in the heatmap
 
