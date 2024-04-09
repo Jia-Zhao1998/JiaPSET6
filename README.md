@@ -31,7 +31,7 @@ Moura Silva Hernandez; Kitoko Jamil Zola; Queiroz Camila Pereira; Kroehling Lina
 
 ## PSET6 Case study
 
-This document is focused on the infering intercellular communication between VAMs and the primary cell type - adipocytes in white adipose tissue. 
+For PSET6, the practice is focused on the infering intercellular communication between VAMs and the primary cell type - adipocytes in white adipose tissue, and here is the essential steps: 
 
 ### Workflow: PSET6 covers step 1 and 2
 
