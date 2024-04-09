@@ -101,7 +101,9 @@ ligand_target_matrix[1:5,1:5] # target genes in rows, ligands in columns
 **Import our RNA-seq dataset containing TRM subset named VAM1 (Vasculature Associated Macrophages 1) and adipocytes for WT and c-Maf deletion**
 
 ```{r}
-cMaf_data <- read_xlsx('~/Desktop/Jia_Zhao_PhD/Projects/Computational/RNASeq/MAF VS WT 07-11-19.xlsx')
+# Need to adjust to your download file! Named: Silva_WAT_cMAF_vs_WT.csv
+# Since I download
+cMaf_data <- read_csv('~/Downloads/Silva_WAT_cMAF_vs_WT.csv')
 head(cMaf_data)
 ```
 
@@ -173,7 +175,7 @@ expressed_genes_receiver_FRC <- FRC_expression_df
 
 # Step 2: Define the gene set of interest and a background of genes
 
-## DEG analysis to define potential genes involved in adipocyte maturation 
+## DEG analysis to define potential genes involved in adipocyte maturation
 
 Here I can start by find differentially expressed genes (DEGs) between adipocytes and preadipocytes to find genes involved in adipocyte maturation
 
