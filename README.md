@@ -37,16 +37,18 @@ For PSET6, the practice is focused on the infering intercellular communication b
 
 
 1. Define a sender cell population and a receiver cell population and determine which genes are expressed in both populations:
+
    Sender: VAMs, receiver: adipocytes
 
-2. (Critical step) Define a gene set. Define differential expressed genes (DEGs) in receiver cells potentially affected by ligands (Most challenging)
+3. (Critical step) Define a gene set. Define differential expressed genes (DEGs) in receiver cells potentially affected by ligands (Most challenging)
+
    DEGs: Use adipocytes RNA-seq data vs preadipocytes (called FRCs (fibroblast reticular cells) in Moura Silva dataset)
 
-3. Define a ligand set: from sender cells and can potentially bind to receiver cells
+5. Define a ligand set: from sender cells and can potentially bind to receiver cells
 
-4. NicheNet ligand activity analysis: rank ligands based on the gene expression of target genes in the receiver cells
+6. NicheNet ligand activity analysis: rank ligands based on the gene expression of target genes in the receiver cells
 
-5. Infer top-predicted target genes based on top-ranked ligands
+7. Infer top-predicted target genes based on top-ranked ligands
 
 
 ## Folder structure
