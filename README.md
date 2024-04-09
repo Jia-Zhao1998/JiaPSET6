@@ -53,7 +53,6 @@ For PSET6, the practice is focused on the infering intercellular communication b
 
 ## Folder structure
 
-At a high level, what is in each folder and subfolder?
 
 I have subfolders in this repo
 
