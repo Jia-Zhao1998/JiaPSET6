@@ -305,6 +305,9 @@ top_upregulated_genes <- gene_Upregulated %>% arrange(desc(log2FoldChange), desc
 
 top_downregulated_genes <- res_df %>%
   filter(padj < 0.05, log2FoldChange < -2) %>% arrange(desc(abs(log2FoldChange)), desc(baseMean)) %>% slice_head(n = 15)
+
+# Combine top 15 upregulated and downregulated genes
+top_genes <- c(rownames(top_upregulated_genes), top_downregulated_genes$gene)
 ```
 
 ```{r}
@@ -322,7 +325,7 @@ ggmaplot(
   alpha = 0.7,
   font.label = c(12, "plain", "black"),
   palette = c("red", "blue", "darkgray"),
-  top = 30,
+  top = 20,
   select.top.method = c("padj", "fc"),
   main = "MA Plot: WT Adipocyte vs FRC",
   xlab = "Log2 mean expression",
@@ -336,38 +339,69 @@ ggmaplot(
 **Volcano plot**
 
 ```{r}
-# Basic Volcano Plot
-with(results, plot(log2FoldChange, -log10(pvalue),
-                   pch=20, main="Volcano Plot: Adipocyte-WT vs FRC-WT"))
-abline(h=-log10(0.05), col="red")
-```
+# pdf("../figure/Volcano_Plot_WT_Adipocyte_vs_FRC.pdf", width = 7, height = 5)
+EnhancedVolcano(res_df,
+                lab = res_df$gene, # Make sure this matches your column name for gene names
+                x = 'log2FoldChange',
+                y = 'padj',
+                xlim = c(-max(abs(res_df$log2FoldChange)), max(abs(res_df$log2FoldChange))),
+                title = 'Volcano Plot: WT Adipocyte vs FRC',
+                xlab = 'Log2 Fold Change',
+                ylab = '-Log10 Adjusted P-value',
+                selectLab = top_genes, # Genes to label: top 
+                pCutoff = 0.05,
+                FCcutoff = 2,
+                pointSize = 2.0,
+                labSize = 4.0,
+                col = c('grey', 'grey', 'grey', 'blue'),
+                colAlpha = 0.5,
+                legendPosition = 'right',
+                legendIconSize = 4.0,
+                drawConnectors = TRUE,
+                widthConnectors = 0.5
+               )
 
-```{r}
-# Enhanced Volcano Plot with thresholds
-thresh_pval <- 0.05
-thresh_lfc <- 2
-
-with(results, {
-  plot(log2FoldChange, -log10(pvalue), pch=20, main="Enhanced Volcano Plot: Adipocyte-WT vs FRC-WT")
-  abline(h=-log10(thresh_pval), col="red")
-  significant <- padj < thresh_pval & abs(log2FoldChange) > thresh_lfc
-  points(log2FoldChange[significant], -log10(pvalue)[significant], pch=20, col="blue")
-})
+# dev.off()
 ```
 
 **Heatmap**
 
 ```{r}
 library(ComplexHeatmap)
+library(circlize)
+
+# Assume 'dds' is your DESeq2 dataset and 'results' is the DESeq2 results
 normalized_counts <- counts(dds, normalized=TRUE)
 top_genes <- rownames(head(results[order(results$padj), ]))
 
+# Create a named vector of colors for the conditions
+condition_colors <- c("Adipocyte-WT" = "red", "FRC" = "blue")
+
+# Make sure the condition in colData is a factor and has the correct levels
+colData(dds)$condition <- factor(colData(dds)$condition, levels = names(condition_colors))
+
+# Create the top annotation based on the condition
+ha <- HeatmapAnnotation(condition = colData(dds)$condition, 
+                        col = list(condition = condition_colors))
+
+# Create the row annotation for fold changes
+ra <- rowAnnotation(FoldChange = results$log2FoldChange[top_genes])
+
+# pdf("../figure/Heatmap_Plot_WT_Adipocyte_vs_FRC.pdf", width = 7, height = 5)
+# Generate the heatmap
 Heatmap(log2(normalized_counts[top_genes, ] + 1),
         name="log2(normalized counts + 1)",
-        top_annotation = HeatmapAnnotation(condition = colData(dds)$condition),
-        left_annotation = rowAnnotation(FoldChange = results$log2FoldChange[top_genes]))
+        top_annotation = ha,
+        left_annotation = ra,
+        show_row_names = TRUE,
+        show_column_names = TRUE)
 
+# dev.off()
 ```
+
+------------------------------------------------------------------------
+
+# HERE ABOVE ARE FOR PSET6. NO NEED TO LOOD DOWN
 
 ```{r}
 geneset_oi = readr::read_tsv(url("https://zenodo.org/record/3260758/files/pemt_signature.txt"), col_names = "gene")%>% pull(gene) %>% .[. %in% rownames(ligand_target_matrix)] # only consider genes also present in the NicheNet model - this excludes genes from the gene list for which the official HGNC symbol was not used by Puram et al.
@@ -662,4 +696,10 @@ In case you want to visualize ligand-target links between multiple interacting c
 
 # References
 
-Puram, Sidharth V., Itay Tirosh, Anuraag S. Parikh, Anoop P. Patel, Keren Yizhak, Shawn Gillespie, Christopher Rodman, et al. 2017. “Single-Cell Transcriptomic Analysis of Primary and Metastatic Tumor Ecosystems in Head and Neck Cancer.” Cell 171 (7): 1611–1624.e24. <https://doi.org/10.1016/j.cell.2017.10.044>.
+**NicheNet**
+
+Browaeys, R.; Saelens, W.; Saeys, Y. NicheNet: Modeling Intercellular Communication by Linking Ligands to Target Genes. Nat. Methods 2020, 17 (2), 159–162. <https://doi.org/10.1038/s41592-019-0667-5>.
+
+**RNA-seq data of fat tissue resident macrophages in fat (VAMs) and other resident cells**
+
+Moura Silva Hernandez; Kitoko Jamil Zola; Queiroz Camila Pereira; Kroehling Lina; Matheis Fanny; Yang Katharine Lu; Reis Bernardo S.; Ren-Fielding Christine; Littman Dan R.; Bozza Marcelo Torres; Mucida Daniel; Lafaille Juan J. C-MAF–Dependent Perivascular Macrophages Regulate Diet-Induced Metabolic Syndrome. Sci. Immunol. 2021, 6 (64), eabg7506. [https://doi.org/10.1126/sciimmunol.abg7506.![image](https://github.com/Jia-Zhao1998/JiaPSET6/assets/67213486/3a65aea6-b3d7-4e45-9b02-ee70328722ec)](https://doi.org/10.1126/sciimmunol.abg7506.!%5Bimage%5D(https://github.com/Jia-Zhao1998/JiaPSET6/assets/67213486/3a65aea6-b3d7-4e45-9b02-ee70328722ec))
